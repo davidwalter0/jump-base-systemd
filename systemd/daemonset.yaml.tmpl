@@ -1,0 +1,75 @@
+# Uses Env variable JUMP_USER to replace {{ .JumpUser }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ds-jump-ssh
+  namespace: default
+data:
+  authorized_keys: '{{ $home := .Home }}{{ cat $home "/.ssh/id_rsa.pub" | file2string  | base64Encode }}'
+  config: '{{ file2string "systemd/dot.ssh/config" | base64Encode }}'
+
+---
+# for versions before 1.8.0 use apps/v1beta1
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: ds-jump-ssh
+  namespace: default
+  labels:
+    app: ds-jump-ssh
+spec:
+  selector:
+    matchLabels:
+      name: ds-jump-ssh
+  template:
+    metadata:
+      labels:
+        name: ds-jump-ssh
+    spec:
+      containers:
+      - name: ssh
+        image: {{.DockerUser}}/debian-stretch-slim-ssh:latest
+        # imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: ssh
+          mountPath: /home/{{ .JumpUser }}/ssh
+          readOnly: false
+        - mountPath: /sys/fs/cgroup
+          name: fs-cgroup
+      volumes:
+      - name: ssh
+        secret:
+          secretName: ds-jump-ssh
+          defaultMode: 420
+      - name: fs-cgroup
+        hostPath:
+          path: /sys/fs/cgroup
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirstWithHostNet
+
+# ------------------------- Service ------------------------- #
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ds-jump-ssh
+  labels:
+    app: ds-jump-ssh
+spec:
+  ports:
+  - port: 2222
+    targetPort: 22
+    name: ssh
+  selector:
+    name: ds-jump-ssh
+  loadBalancerIP: 192.168.0.224
+  type: LoadBalancer
+
+# local variables:
+# mode: yaml
+# end:
+

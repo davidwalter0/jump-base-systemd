@@ -1,0 +1,106 @@
+# docker build --no-cache --tag=ubuntu-systemd .&
+
+# on ubuntu 17.04 default install with ext4 file system, aufs failed
+# with kernel 4.13.0-12-generic, had to modify /etc/docker/daemon.json
+# to use overlay2
+# {
+#   "storage-driver": "overlay2"
+# }
+# ------------------------------------------------------------------------
+# container_linux.go:247: starting container process caused
+# "process_linux.go:359: container init caused \"rootfs_linux.go:54:
+# mounting \\\"cgroup\\\" to rootfs \\\"/var/lib/docker/auf
+# ------------------------------------------------------------------------
+
+# FROM debian:9.2
+FROM davidwalter/debian-stretch-slim
+# You can change the FROM Instruction to your existing images if you like and build it with same tag
+ENV container docker
+ENV LC_ALL C
+ENV DEBIAN_FRONTEND noninteractive
+RUN echo 'APT::Install-Recommends "0"; \n\
+APT::Get::Assume-Yes "true"; \n\
+APT::Get::force-yes "true"; \n\
+APT::Install-Suggests "0";' > /etc/apt/apt.conf.d/01buildconfig
+RUN mkdir -p  /etc/apt/sources.d/
+RUN echo "deb mirror://mirrors.ubuntu.com/mirrors.txt stretch main restricted universe multiverse \n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt stretch-updates main restricted universe multiverse \n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt stretch-backports main restricted universe multiverse \n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt stretch-security main restricted universe multiverse" > /etc/apt/sources.d/ubuntu-mirrors.list
+RUN apt-get update && apt-get install systemd systemd-container && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN cd /lib/systemd/system/sysinit.target.wants/; ls | grep -v systemd-tmpfiles-setup | xargs rm -f $1 \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*; \
+rm -f /lib/systemd/system/plymouth*; \
+rm -f /lib/systemd/system/systemd-update-utmp*;
+ENV init /lib/systemd/systemd
+
+
+ENV container docker
+# ENV LC_ALL C
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
+RUN  apt-get -qq -y update; \
+     apt-get -qq -y install --reinstall openssh-client openssh-server rsync git bash sudo ; \
+     apt-get -qq -y clean ; apt-get -qq -y autoclean; apt-get -qq -y autoremove ; \
+     localedef -v -c -i en_US -f UTF-8 en_US.UTF-8  ;           \
+     localedef -v -c -i en_US -f UTF-8 en_US  || true ;         \
+     locale-gen || true ; \
+     printf "export LC_ALL=en_US.UTF-8\nexport LANG=en_US.UTF-8\n" >> /etc/profile
+
+# Setting openssh
+RUN mkdir -p /etc/ssh /var/run/sshd ; \
+    sed -i "s/#PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config ; \
+    ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N ""; \
+    ssh-keygen -t dsa -f /etc/ssh/ssh_host_dsa_key -N ""; \
+    ssh-keygen -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N ""; \
+    ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N "";  \
+    addgroup --gid 1000 {{ .JumpUser }} ;                                       \
+    adduser --shell /bin/bash --disabled-password --home /home/{{ .JumpUser }} --uid 1000 --gid 1000 {{ .JumpUser }} ; \
+    echo '{{ .JumpUser }} ALL=NOPASSWD:ALL' >> /etc/sudoers;  \
+    mkdir -p /home/{{ .JumpUser }}/.ssh /root/.ssh/;          \
+    touch /home/{{ .JumpUser }}/.ssh/authorized_keys ;        \
+    touch /home/{{ .JumpUser }}/.hushlogin;                   \
+    chmod 700 /home/{{ .JumpUser }}/.ssh /root/.ssh; \
+    chown {{ .JumpUser }} -R /home/{{ .JumpUser }} /home/{{ .JumpUser }}/.ssh; \
+    rm -f /var/run/nologin /run/nologin;
+
+RUN apt -yq install locales; echo "LC_ALL=en_US.UTF-8" >> /etc/environment;  \
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen ; \
+    echo "LANG=en_US.UTF-8" > /etc/locale.conf; \
+    locale-gen en_US.UTF-8; 
+# ...
+# COPY dot.ssh/ /home/{{ .JumpUser }}/.ssh/
+# COPY dot.ssh/ /root/.ssh/
+COPY run.sh /usr/bin/run.sh
+COPY systemd-user-sessions.service /lib/systemd/system/systemd-user-sessions.service
+# Moved to run.sh
+# RUN systemctl set-default multi-user.target; systemctl default; systemctl isolate default.target
+RUN chown -R {{ .JumpUser }}:{{ .JumpUser }} /home/{{ .JumpUser }}; \
+    chmod +x /usr/bin/run.sh; \
+    chmod 644 /lib/systemd/system/systemd-user-sessions.service
+# Add in utilities
+# RUN mkdir -p /go/bin
+# COPY bin/ /go/bin/
+EXPOSE 22
+
+VOLUME [ "/sys/fs/cgroup" ]
+ENTRYPOINT ["/usr/bin/run.sh"]
+
+# local variables:
+# mode: conf
+# end:
+
+# docker run -it --privileged=true -v /sys/fs/cgroup:/sys/fs/cgroup:ro davidwalter/debian-systemd-ssh /lib/systemd/systemd systemd.unit=emergency.service
+# docker run -it --privileged=true -v /sys/fs/cgroup:/sys/fs/cgroup:ro davidwalter/debian-systemd-ssh /lib/systemd/systemd
+# docker run -it --privileged=true -v /sys/fs/cgroup:/sys/fs/cgroup:ro 444c127c995b /lib/systemd/systemd systemd.unit=emergency.service
+# docker run -it --rm -P --cap-add=SYS_ADMIN -v /sys/fs/cgroup:/sys/fs/cgroup:ro --log-driver=syslog --log-opt tag="poc-systemd" bronto/poc-systemd
+
+# docker run -it --privileged=true --cap-add=SYS_ADMIN -v /home/david/.ssh:/home/david/.ssh -v /sys/fs/cgroup:/sys/fs/cgroup:ro davidwalter/ssh /lib/systemd/systemd
+# docker run -it --privileged=true                                                          -v /sys/fs/cgroup:/sys/fs/cgroup:ro davidwalter/ssh /lib/systemd/systemd

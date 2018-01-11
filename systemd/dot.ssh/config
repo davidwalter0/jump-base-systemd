@@ -1,0 +1,16 @@
+UserKnownHostsFile      /dev/null
+StrictHostKeyChecking   no
+LogLevel                quiet
+# LogLevel              verbose
+VerifyHostKeyDNS        no
+ForwardX11Trusted       yes
+ForwardAgent            yes
+ForwardX11              yes
+ConnectTimeout          30
+TCPKeepAlive            yes
+ServerAliveCountMax     5
+ControlMaster           no
+Compression             yes
+# if GSSAPIAuthentication is yes but hosts don't support it,
+# connections are slower.
+GSSAPIAuthentication    no

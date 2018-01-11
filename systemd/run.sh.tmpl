@@ -1,0 +1,15 @@
+#!/bin/bash
+mkdir -p /home/{{ .JumpUser }}/.ssh /root/.ssh
+cp /home/{{ .JumpUser }}/ssh/* /home/{{ .JumpUser }}/.ssh/
+cp /home/{{ .JumpUser }}/ssh/* /root/.ssh/
+chmod 644 /home/{{ .JumpUser }}/.ssh/*
+chown -R {{ .JumpUser }}:{{ .JumpUser }} /home/{{ .JumpUser }}/.ssh/
+chmod 644 /root/.ssh/*
+chown -R root:root /root/.ssh/
+systemctl set-default multi-user.target; 
+systemctl default; 
+systemctl isolate default.target
+systemctl enable systemd-user-sessions.service
+# ( sleep 10; systemctl start systemd-user-sessions.service )&
+systemctl start systemd-user-sessions.service
+exec /lib/systemd/systemd 
