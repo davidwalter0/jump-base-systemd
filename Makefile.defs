@@ -1,0 +1,32 @@
+
+define text
+
+This project uses a golang template processing utility to update the
+configuration and depends on environment variables KEY_FILE and JUMP_USER
+
+Environment variables are referenced as camel case in template double
+curly braces like
+
+KEY_FILE {{ .KeyFile }} and JUMP_USER is {{ .JumpUser }})
+
+The repo uses template util github.com/$(DOCKER_USER)0/applytmpl
+
+endef
+
+define jumptext
+
+JUMP_USER  environment variable should be set in the Makefile
+or with export JUMP_USER. The template systemd/daemonset.yaml.tmpl
+systemd/deploy.yaml.tmpl create secret using an authorized_keys
+file named by the KEY_FILE environment variable
+
+example template use:
+
+  authorized_keys: '{{ file2string .KeyFile  | base64Encode }}'
+
+example environment variable setup:
+
+export JUMP_USER=jump
+export KEY_FILE=${HOME}/.ssh/id_rsa.pub
+
+endef

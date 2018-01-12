@@ -1,3 +1,18 @@
+# Copyright 2018 David Walter.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 # docker build --no-cache --tag=ubuntu-systemd .&
 
 # on ubuntu 17.04 default install with ext4 file system, aufs failed
@@ -13,7 +28,7 @@
 # ------------------------------------------------------------------------
 
 # FROM debian:9.2
-FROM davidwalter/debian-stretch-slim
+FROM {{ .DockerUser }}/debian-stretch-slim
 # You can change the FROM Instruction to your existing images if you like and build it with same tag
 ENV container docker
 ENV LC_ALL C

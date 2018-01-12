@@ -1,12 +1,36 @@
-# Uses Env variable JUMP_USER to replace {{ .JumpUser }}
+# Copyright 2018 David Walter.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# This file uses golang template processing to update the configuration
+# It depends on the environment variables:
+# PUBLIC_KEY_FILE
+# JUMP_USER
+# when applytmpl was last run the environment variables were set to:
+# PUBLIC_KEY_FILE  {{ .PublicKeyFile }}
+# JUMP_USER  {{ .JumpUser }}
+# .PublicKeyFile  {{ .PublicKeyFile }}
+# .JumpUser  {{ .JumpUser }}
+
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: deploy-jump-ssh
+  name: jump-{{.JumpUser}}-dp
   namespace: default
 data:
-  authorized_keys: '{{ $home := .Home }}{{ cat $home "/.ssh/id_rsa.pub" | file2string  | base64Encode }}'
+  authorized_keys: '{{ file2string .PublicKeyFile  | base64Encode }}'
   config: '{{ file2string "systemd/dot.ssh/config" | base64Encode }}'
 
 ---
@@ -14,7 +38,7 @@ data:
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
-  name: deploy-jump-ssh
+  name: jump-{{.JumpUser}}-dp
   namespace: default
   labels:
     app: ssh
@@ -22,11 +46,11 @@ spec:
   replicas: 2
   selector:
     matchLabels:
-      name: deploy-jump-ssh
+      name: jump-{{.JumpUser}}-dp
   template:
     metadata:
       labels:
-        name: deploy-jump-ssh
+        name: jump-{{.JumpUser}}-dp
     spec:
       containers:
       - name: ssh
@@ -47,7 +71,7 @@ spec:
       volumes:
       - name: ssh
         secret:
-          secretName: deploy-jump-ssh
+          secretName: jump-{{.JumpUser}}-dp
           defaultMode: 420
       - name: fs-cgroup
         hostPath:
@@ -60,9 +84,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: deploy-jump-ssh
+  name: jump-{{.JumpUser}}-dp
   labels:
-    app: deploy-jump-ssh
+    app: jump-{{.JumpUser}}-dp
 spec:
   ports:
   - port: 2222
@@ -71,7 +95,7 @@ spec:
   loadBalancerIP: 192.168.0.222
   type: LoadBalancer
   selector:
-    name: deploy-jump-ssh
+    name: jump-{{.JumpUser}}-dp
 
 # local variables:
 # mode: yaml
