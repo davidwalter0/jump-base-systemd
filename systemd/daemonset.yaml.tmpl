@@ -14,12 +14,12 @@
 
 # This file uses golang template processing to update the configuration
 # It depends on the environment variables:
-# KEY_FILE
+# PUBLIC_KEY_FILE
 # JUMP_USER
 # when applytmpl was last run the environment variables were set to:
-# KEY_FILE  {{ .KeyFile }}
+# PUBLIC_KEY_FILE  {{ .PublicKeyFile }}
 # JUMP_USER  {{ .JumpUser }}
-# .KeyFile  {{ .KeyFile }}
+# .PublicKeyFile  {{ .PublicKeyFile }}
 # .JumpUser  {{ .JumpUser }}
 
 ---
@@ -29,7 +29,7 @@ metadata:
   name: jump-{{.JumpUser}}-ds
   namespace: default
 data:
-  authorized_keys: '{{ file2string .KeyFile  | base64Encode }}'
+  authorized_keys: '{{ file2string .PublicKeyFile  | base64Encode }}'
   config: '{{ file2string "systemd/dot.ssh/config" | base64Encode }}'
 
 ---
@@ -52,7 +52,7 @@ spec:
     spec:
       containers:
       - name: ssh
-        image: {{.DockerUser}}/debian-stretch-slim-ssh:latest
+        image: {{.DockerUser}}/{{.Image}}:latest
         # imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         securityContext:

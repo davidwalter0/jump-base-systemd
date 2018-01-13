@@ -19,7 +19,7 @@
 # export PUBLIC_KEY_FILE=$(HOME)/.ssh/id_rsa.pub
 # export JUMP_USER=jump
 # export DOCKER_USER=$(DOCKER_USER)
-
+export IMAGE=$(notdir $(PWD))
 include Makefile.defs
 export version=$$(cat .version)
 
@@ -67,9 +67,11 @@ apply: yaml .dep .dep/apply
 
 image: .dep/image
 
-tag: image .version
+.dep/tag: image .version
 	docker tag $(DOCKER_USER)/$(notdir $(PWD)):latest $(DOCKER_USER)/$(notdir $(PWD)):$$(cat .version)
-	touch tag
+	touch .dep/tag
+
+tag: .dep/tag
 
 push: tag .version
 	docker push $(DOCKER_USER)/$(notdir $(PWD)):latest

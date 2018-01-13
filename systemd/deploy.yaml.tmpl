@@ -54,7 +54,7 @@ spec:
     spec:
       containers:
       - name: ssh
-        image: {{.DockerUser}}/debian-stretch-slim-ssh:latest
+        image: {{.DockerUser}}/{{.Image}}:latest
         # imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         securityContext:

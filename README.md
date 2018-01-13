@@ -59,6 +59,7 @@ authorized_keys: '{{ file2string .KeyFile  | base64Encode }}'
 example environment variable setup:
 
 ```
+export DOCKER_USER=hub.docker.com-uid
 export JUMP_USER=jump
 export PUBLIC_KEY_FILE=${HOME}/.ssh/id_rsa.pub
 make apply push
