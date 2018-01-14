@@ -14,7 +14,7 @@ is used to populate the container users `.ssh/` with
 run.sh
 
 The jump container uses the userid specified in the environment
-variable `JUMP_USER` in templates called by `make apply` target in the
+variable `JUMP_USER` in templates called by `make  deploy` target in the
 Makefile
 
 The configuration assumes that the current user owns the container and
@@ -40,9 +40,8 @@ curly braces like `PUBLIC_KEY_FILE` referenced as `{{ .PublicKeyFile
 The golang template text processing utility used is
 `github.com/davidwalter0/applytmpl`
 
-
 ```
-authorized_keys: '{{ file2string .KeyFile  | base64Encode }}'
+authorized_keys: '{{ file2string .PublicKeyFile  | base64Encode }}'
 ```
 
 JUMP_USER environment variable should be set in the Makefile or with
@@ -53,15 +52,30 @@ from the user's home directory
 example template use:
 
 ```
-authorized_keys: '{{ file2string .KeyFile  | base64Encode }}'
+authorized_keys: '{{ file2string .PublicKeyFile  | base64Encode }}'
 ```
 
 example environment variable setup:
 
 ```
 export DOCKER_USER=hub.docker.com-uid
-export JUMP_USER=jump
+export JUMP_USER=jump-user
 export PUBLIC_KEY_FILE=${HOME}/.ssh/id_rsa.pub
-make apply push
+make image push tag-push deploy push
 ```
 
+---
+### TCP connection support
+
+Running a jump server in cluster for debugging with ssh can be done as
+well, like `github.com/davidwalter0/jump-base-systemd` and running an
+instance.
+
+
+```
+host jump
+     hostname 192.168.0.222
+     user jump-user
+     port 2222
+     IdentityFile ~/.ssh/id_rsa
+```

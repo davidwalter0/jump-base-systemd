@@ -12,69 +12,86 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
-.PHONY: push yaml
-
-# export PUBLIC_KEY_FILE=$(HOME)/.ssh/id_rsa.pub
-# export JUMP_USER=jump
-# export DOCKER_USER=$(DOCKER_USER)
+.PHONY: install clean image build yaml appl get push tag tag-push
+# To enable kubernetes commands a valid configuration is required
+export GOPATH=/go
+export kubectl=${GOPATH}/bin/kubectl  --kubeconfig=${PWD}/cluster/auth/kubeconfig
+SHELL=/bin/bash
+MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+CURRENT_DIR := $(notdir $(patsubst %/,%,$(dir $(MAKEFILE_DIR))))
+export DIR=$(MAKEFILE_DIR)
+export APPL=$(notdir $(PWD))
 export IMAGE=$(notdir $(PWD))
+# extract tag from latest commit, use tag for version
+export gittag=$$(git tag -l --contains $(git hsh -n1))
+export TAG=$(shell if [[ -n $${gittag} ]]; then echo $${gittag}; else echo "canary"; fi)
+
 include Makefile.defs
-export version=$$(cat .version)
 
-ifeq ($(DOCKER_USER),)
-$(warning $(text))
-$(error environment variable DOCKER_USER hub.docker.com login userid not set)
-endif
+all:
+	@echo $(state)
 
-ifeq ($(PUBLIC_KEY_FILE),)
-$(warning $(text))
-$(error environment variable PUBLIC_KEY_FILE not set)
-endif
-
-ifeq ($(JUMP_USER),) 
-
-$(warning $(text) $(jumptext))
-
-$(error environment variable JUMP_USER is not set)
-endif
-
-apply_list:=$(patsubst %.tmpl,%,$(wildcard systemd/*.tmpl))
-
-all: yaml apply image push
+etags:
+	etags $(depends) $(build_deps)
 
 .dep:
 	mkdir -p .dep
 
-yaml: .dep .dep/yaml $(wildcard systemd/*.tmpl)
+image: .dep .dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG)
 
-.dep/yaml: .dep $(wildcard systemd/*.tmpl)
-	@for file in $(apply_list); do echo $${file}; done
+.dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep
+	cd systemd; docker build --tag=$(DOCKER_USER)/$(APPL):latest .
+	touch $@ 
+
+.dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+	docker tag $(DOCKER_USER)/$(APPL):latest \
+	$(DOCKER_USER)/$(APPL):$${TAG}
+	touch $@ 
+
+tag: .dep .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+	@echo $(state)
+
+push: .dep .dep/push-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+
+.dep/push-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep image
+	docker push $(DOCKER_USER)/$(APPL):latest
+	touch $@
+
+tag-push: .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG) .dep/tag-push-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+
+.dep/tag-push-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep 
+	docker push $(DOCKER_USER)/$(APPL):$${TAG}
+	touch $@
+
+deploy_list:=$(patsubst %.tmpl,%,$(wildcard systemd/*.tmpl))
+
+yaml: .dep .dep/yaml-$(DOCKER_USER)-$(IMAGE)-$(TAG) 
+
+.dep/yaml-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep $(wildcard systemd/*.tmpl)
+	@for file in $(deploy_list); do echo $${file}; done
 	for file in $(wildcard systemd/*.tmpl); do echo "${GOPATH}/bin/applytmpl < $${file} > $${file%.tmpl}"; done
+	for file in $(wildcard systemd/*.tmpl); do ${GOPATH}/bin/applytmpl < $${file} > $${file%.tmpl}; done
 	@echo "$@ build complete $^"
-	touch .dep/yaml
+	touch $@
 
-apply: yaml .dep .dep/apply
+delete: .dep/delete
 
-.dep/apply: yaml .dep $(wildcard systemd/*.tmpl)
-	for file in */*.tmpl; do ${GOPATH}/bin/applytmpl < $${file} > $${file%.tmpl}; done
-	touch .dep/apply
+.dep/delete: yaml
+	$(kubectl) delete ds/$(APPL) || true
 
-.dep/image: Makefile systemd/Dockerfile.tmpl .version .dep/yaml .dep/apply
-	cd systemd; docker build --tag=$(DOCKER_USER)/$(notdir $(PWD)):latest .
-	touch .dep/image
+deploy: .dep/deploy
 
-image: .dep/image
+.dep/deploy: .dep yaml
+	$(kubectl) apply -f systemd/deployment.yaml
 
-.dep/tag: image .version
-	docker tag $(DOCKER_USER)/$(notdir $(PWD)):latest $(DOCKER_USER)/$(notdir $(PWD)):$$(cat .version)
-	touch .dep/tag
+get: .dep 
 
-tag: .dep/tag
+.dep/get: .dep yaml
+	$(kubectl) get -f systemd/deployment.yaml
 
-push: tag .version
-	docker push $(DOCKER_USER)/$(notdir $(PWD)):latest
-	docker push $(DOCKER_USER)/$(notdir $(PWD)):$$(cat .version)
-clean:
-	rm .dep/*
+clean: .dep bin 
+	@if [[ -d "bin" ]]; then rmdir bin; fi
+	rm -f .dep/*
+
+bin:
+	mkdir -p bin
