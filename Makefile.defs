@@ -82,6 +82,18 @@ $(warning $(state))
 $(error environment variable PUBLIC_KEY_FILE not set)
 endif
 
+define info
+
+echo "--------------------------------------------"
+echo "DOCKER_USER = $(DOCKER_USER)"
+echo "IMAGE       = $(IMAGE)      "
+echo "TAG         = $(TAG)"
+echo "APPL        = $(APPL)"
+echo "JUMP_USER   = $(JUMP_USER)"
+echo "--------------------------------------------"
+
+endef
+
 # Local variables:
 # mode: makefile
 # end:

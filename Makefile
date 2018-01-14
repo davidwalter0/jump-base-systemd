@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: install clean image build yaml appl get push tag tag-push
+.PHONY: install clean build yaml appl get push tag tag-push info
 # To enable kubernetes commands a valid configuration is required
+deploy_list:=$(patsubst %.tmpl,%,$(wildcard systemd/*.tmpl))
 export GOPATH=/go
 export kubectl=${GOPATH}/bin/kubectl  --kubeconfig=${PWD}/cluster/auth/kubeconfig
 SHELL=/bin/bash
@@ -28,42 +29,44 @@ export TAG=$(shell if git diff --quiet --ignore-submodules HEAD && [[ -n $(gitta
 
 include Makefile.defs
 
-all:
+all: info
+
+info: 
+	@echo $(info)
 
 etags:
 	etags $(depends) $(build_deps)
 
 .dep:
 	mkdir -p .dep
+	touch .dep --reference=Makefile
 
-image: .dep .dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG)
-
-.dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep
-	cd systemd; docker build --tag=$(DOCKER_USER)/$(APPL):latest .
+.dep/image-$(DOCKER_USER)-$(IMAGE)-latest: .dep
+	cd systemd; \
+	docker build --tag=$(DOCKER_USER)/$(IMAGE):latest .
 	touch $@ 
 
-.dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG)
-	docker tag $(DOCKER_USER)/$(APPL):latest \
-	$(DOCKER_USER)/$(APPL):$${TAG}
+tag: info .dep .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+	@echo $(info)
+
+.dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep/image-$(DOCKER_USER)-$(IMAGE)-latest
+	docker tag $(DOCKER_USER)/$(IMAGE):latest \
+	$(DOCKER_USER)/$(IMAGE):$${TAG}
 	touch $@ 
 
-tag: .dep .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+push: info .dep .dep/push-$(DOCKER_USER)-$(IMAGE)-latest
 
-push: .dep .dep/push-$(DOCKER_USER)-$(IMAGE)-latest
-
-.dep/push-$(DOCKER_USER)-$(IMAGE)-latest: .dep image
-	docker push $(DOCKER_USER)/$(APPL):latest
+.dep/push-$(DOCKER_USER)-$(IMAGE)-latest: .dep/image-$(DOCKER_USER)-$(IMAGE)-latest
+	docker push $(DOCKER_USER)/$(IMAGE):latest
 	touch $@
 
-tag-push: .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG) .dep/tag-push-$(DOCKER_USER)-$(IMAGE)-$(TAG)
+tag-push: info .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG) .dep/tag-push-$(DOCKER_USER)-$(IMAGE)-$(TAG)
 
-.dep/tag-push-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep 
-	docker push $(DOCKER_USER)/$(APPL):$${TAG}
+.dep/tag-push-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep/image-$(DOCKER_USER)-$(IMAGE)-latest
+	docker push $(DOCKER_USER)/$(IMAGE):$(TAG)
 	touch $@
 
-deploy_list:=$(patsubst %.tmpl,%,$(wildcard systemd/*.tmpl))
-
-yaml: .dep .dep/yaml-$(DOCKER_USER)-$(IMAGE)-$(TAG) 
+yaml: info .dep .dep/yaml-$(DOCKER_USER)-$(IMAGE)-$(TAG)
 
 .dep/yaml-$(DOCKER_USER)-$(IMAGE)-$(TAG): .dep $(wildcard systemd/*.tmpl)
 	@for file in $(deploy_list); do echo $${file}; done
@@ -77,12 +80,12 @@ delete: .dep/delete
 .dep/delete: yaml
 	$(kubectl) delete ds/$(APPL) || true
 
-deploy: .dep/deploy
+deploy: info .dep/deploy
 
 .dep/deploy: .dep yaml
 	$(kubectl) apply -f systemd/deployment.yaml
 
-get: .dep 
+get: info .dep 
 
 .dep/get: .dep yaml
 	$(kubectl) get -f systemd/deployment.yaml
