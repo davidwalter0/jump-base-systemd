@@ -41,7 +41,7 @@ etags:
 	mkdir -p .dep
 	touch .dep --reference=Makefile
 
-.dep/image-$(DOCKER_USER)-$(IMAGE)-latest: .dep
+.dep/image-$(DOCKER_USER)-$(IMAGE)-latest: .dep $(wildcard systemd/Dockerfile systemd/*.tmpl systemd/systemd-user-sessions.service)
 	cd systemd; \
 	docker build --tag=$(DOCKER_USER)/$(IMAGE):latest .
 	touch $@ 
