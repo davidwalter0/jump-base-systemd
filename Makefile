@@ -23,13 +23,12 @@ export DIR=$(MAKEFILE_DIR)
 export APPL=$(notdir $(PWD))
 export IMAGE=$(notdir $(PWD))
 # extract tag from latest commit, use tag for version
-export gittag=$$(git tag -l --contains $(git hsh -n1))
-export TAG=$(shell if [[ -n $${gittag} ]]; then echo $${gittag}; else echo "canary"; fi)
+export gittag=$$(git tag -l --contains $(git log --pretty="format:%h"  -n1))
+export TAG=$(shell if git diff --quiet --ignore-submodules HEAD && [[ -n $(gittag) ]]; then echo $(gittag); else echo "canary"; fi)
 
 include Makefile.defs
 
 all:
-	@echo $(state)
 
 etags:
 	etags $(depends) $(build_deps)
@@ -49,7 +48,6 @@ image: .dep .dep/image-$(DOCKER_USER)-$(IMAGE)-$(TAG)
 	touch $@ 
 
 tag: .dep .dep/tag-$(DOCKER_USER)-$(IMAGE)-$(TAG)
-	@echo $(state)
 
 push: .dep .dep/push-$(DOCKER_USER)-$(IMAGE)-$(TAG)
 
